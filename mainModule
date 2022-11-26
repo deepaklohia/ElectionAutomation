@@ -1,0 +1,183 @@
+Option Explicit
+'code designed by Deepak Lohia at www.dLohia.com
+
+Sub importFiles()
+
+Dim sMyDir, default_path, sDocName As String
+Dim srcLastRow   As Long
+Dim Src_LastCol As Integer
+Dim desLastRow As Long
+Dim SrcCol As Integer
+Dim DestnCol As Integer
+Dim Src_Rng  As Excel.Range
+Dim answer As Integer
+Dim desWS As Excel.Worksheet
+ 
+Dim srcwB As Excel.Workbook
+Dim desWB As Excel.Workbook
+Dim srcSh As Excel.Worksheet
+Set desWB = ThisWorkbook   '
+Set desWS = desWB.Sheets("Export")
+
+Application.ScreenUpdating = False
+
+'**************************************CHANGE IT TO C:\YOUR_IMPORT_FILES_FOLDER
+default_path = Sheet1.txbx_ImportLoc.Value
+'******************************************************************************
+
+'CHECKING IF SOURCE FILES FOLDER EXIST
+If Dir(default_path & "\", vbDirectory) = "" Then
+     MsgBox default_path & "-Folder not found ", vbCritical
+     Exit Sub
+End If
+
+'IF THERE ARE NO FILES FOUND IN IMPORT FOLDER
+If Dir(default_path & "\") = "" Then
+    MsgBox "No files in Import Folder ", vbCritical
+    Call Shell("explorer.exe " & default_path & "\", vbNormalFocus)
+    Exit Sub
+End If
+
+'HERE WE ARE CLEARNING FILES
+answer = MsgBox("Are you sure you want to empty export sheet?", vbOKCancel + vbQuestion, "Clear Existing Data?")
+If answer = vbOK Then
+    With ThisWorkbook.Sheets("Export")
+           With desWS
+                desLastRow = .Cells(.Rows.Count, "A").End(xlUp).Row + 5
+           End With
+        
+          .Range("A2:ED" & desLastRow).ClearContents
+    End With
+Else
+    Exit Sub
+End If
+
+
+
+Dim srcFirst As Boolean
+Dim ptNumber As String
+Dim polStn As String
+Dim i, j As Long
+Dim dta, str As String
+Dim desRow  As Long
+
+sMyDir = (default_path & "\")
+sDocName = Dir(sMyDir)
+
+
+
+
+'THIS LOOP IS TO CHECK AND OPEN EACH FILE IN THE SOURCE FOLDER
+While sDocName <> ""
+    If sDocName Like "*.xls*" Or sDocName Like "*.csv*" Then
+
+      Set srcwB = Workbooks.Open(sMyDir & sDocName, ReadOnly:=True)
+           
+           'Set srcSheet = Src_WB.Sheets(1)
+           
+           With desWS
+                desLastRow = .Cells(.Rows.Count, "A").End(xlUp).Row + 1
+                desRow = desLastRow
+           End With
+           
+        
+           srcFirst = False
+           For Each srcSh In srcwB.Sheets
+           
+            With srcSh
+                
+                If srcFirst = False Then
+                    ptNumber = VBA.Split(.Range("K3").Value, "of Part Nos")(0)
+                    ptNumber = VBA.Trim(ptNumber)
+                
+                    polStn = VBA.Split(.Range("C10").Value, "No. and Name of Polling Station :")(1)
+                    polStn = VBA.Replace(polStn, "Address of Polling Station :", "")
+                    polStn = VBA.Trim(polStn)
+                    
+                    srcFirst = True
+                    GoTo nextSh:
+                End If
+           
+               
+                With .UsedRange
+                    srcLastRow = .Rows(.Rows.Count).Row
+                End With
+        
+                     
+                For i = 1 To srcLastRow
+                        
+                         dta = .Range("A" & i).Value
+                        
+                        If VBA.InStr(dta, "Name :") > 0 And VBA.InStr(dta, "Relation :") > 0 Then
+                        
+                                'part number
+                                 desWS.Range("A" & desRow).Value = ptNumber
+                                 
+                                'polling station
+                                 desWS.Range("B" & desRow).Value = polStn
+                                
+                                'sno number
+                                desWS.Range("C" & desRow).Value = VBA.Trim(.Cells(i - 1, "A").Value)
+                                
+                                'ref number
+                                desWS.Range("D" & desRow).Value = VBA.Trim(.Cells(i - 1, "B").Value)
+                            
+                                'name
+                                str = VBA.Split(dta, "Name :")(1)
+                                str = VBA.Split(str, "Relation :")(0)
+                                str = VBA.Replace(str, "  ", " ")
+                                desWS.Range("E" & desRow).Value = VBA.Trim(str) 'name
+                                
+                                'Relation
+                                str = VBA.Split(dta, "Relation :")(1)
+                                str = VBA.Split(str, "Address :")(0)
+                                desWS.Range("F" & desRow).Value = VBA.Trim(str) 'Relation
+                                
+                                'Address
+                                '.Select
+                                '.Range("A" & i).Select
+                                
+                                If VBA.InStr(dta, "Address :") > 0 Then
+                                    str = VBA.Split(dta, "Address :")(1)
+                                Else
+                                    str = VBA.Split(dta, "Address")(1)
+                                End If
+                                str = VBA.Split(str, "Age :")(0)
+                                desWS.Range("G" & desRow).Value = VBA.Trim(str) 'Address
+                                
+                               
+                               If VBA.InStr(dta, "Age :") > 0 And VBA.InStr(dta, "Sex :") > 0 Then
+                                    'Age
+                                    str = VBA.Split(dta, "Age :")(1)
+                                    str = VBA.Split(str, "Sex :")(0)
+                                    desWS.Range("H" & desRow).Value = VBA.Trim(str) 'Age
+                                    
+                                    'Sex
+                                    str = VBA.Split(dta, "Sex :")(1)
+                                    desWS.Range("I" & desRow).Value = VBA.Trim(str) 'Age
+                                End If
+                                
+                                desRow = desRow + 1
+                            
+                        End If
+                    
+                Next i
+               
+nextSh:
+           End With
+           Application.StatusBar = "Working..." & srcwB.Name & ">>" & srcSh.Name
+        Next srcSh
+           
+ 
+    Excel.Workbooks(sDocName).Close False
+    End If
+    
+ sDocName = Dir()
+Wend
+  
+Application.StatusBar = False
+
+Application.ScreenUpdating = True
+MsgBox "Done", vbInformation
+ 
+End Sub
